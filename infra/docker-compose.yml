@@ -1,0 +1,97 @@
+version: "3.9"
+
+services:
+  # ── MongoDB ────────────────────────────────────────────────────────────────
+  mongo:
+    image: mongo:7
+    restart: unless-stopped
+    volumes:
+      - mongo_data:/data/db
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: ${MONGO_USER}
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_PASSWORD}
+      MONGO_INITDB_DATABASE: ${MONGO_DB}
+    ports:
+      - "127.0.0.1:27017:27017"
+
+  # ── Qdrant ─────────────────────────────────────────────────────────────────
+  qdrant:
+    image: qdrant/qdrant:v1.9.2
+    restart: unless-stopped
+    volumes:
+      - qdrant_data:/qdrant/storage
+    ports:
+      - "127.0.0.1:6333:6333"
+
+  # ── Redis ─────────────────────────────────────────────────────────────────
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: redis-server --requirepass ${REDIS_PASSWORD}
+    volumes:
+      - redis_data:/data
+    ports:
+      - "127.0.0.1:6379:6379"
+
+  # ── FastAPI backend ────────────────────────────────────────────────────────
+  api:
+    build:
+      context: ../backend
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    env_file: .env
+    depends_on: [mongo, qdrant, redis]
+    ports:
+      - "127.0.0.1:8000:8000"
+    volumes:
+      - gcp_creds:/app/gcp:ro
+
+  # ── Celery synthesis worker ────────────────────────────────────────────────
+  worker-synthesis:
+    build:
+      context: ../backend
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    command: celery -A celery_app worker -Q synthesis -c 1 --loglevel=info
+    env_file: .env
+    depends_on: [mongo, redis, qdrant]
+    volumes:
+      - gcp_creds:/app/gcp:ro
+
+  # ── Celery push worker ─────────────────────────────────────────────────────
+  worker-push:
+    build:
+      context: ../backend
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    command: celery -A celery_app worker -Q push -c 4 --loglevel=info
+    env_file: .env
+    depends_on: [redis]
+
+  # ── Celery beat scheduler ──────────────────────────────────────────────────
+  beat:
+    build:
+      context: ../backend
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    command: celery -A celery_app beat --loglevel=info
+    env_file: .env
+    depends_on: [redis, mongo]
+
+  # ── Flower (Celery monitoring) ─────────────────────────────────────────────
+  flower:
+    build:
+      context: ../backend
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    command: celery -A celery_app flower --port=5555 --basic_auth=${FLOWER_USER}:${FLOWER_PASSWORD}
+    env_file: .env
+    depends_on: [redis]
+    ports:
+      - "127.0.0.1:5555:5555"
+
+volumes:
+  mongo_data:
+  qdrant_data:
+  redis_data:
+  gcp_creds:
