@@ -2,6 +2,16 @@
 # Shared config + helpers for bootstrap-ubuntu-phase1 / phase2 scripts.
 # Sourced by those scripts — do not run directly.
 
+# Default repo path: honour REPO_DIR, else discover ~/combined-intelligence or /srv/...
+if [[ -z "${REPO_DIR:-}" ]]; then
+  _ci_home="$(getent passwd "${SUDO_USER:-${USER:-root}}" 2>/dev/null | cut -d: -f6 || echo "${HOME}")"
+  for _d in "${_ci_home}/combined-intelligence" "/srv/combined-intelligence"; do
+    if [[ -d "${_d}/.git" ]] || [[ -f "${_d}/infra/scripts/bootstrap-ubuntu-common.sh" ]]; then
+      REPO_DIR="$_d"
+      break
+    fi
+  done
+fi
 REPO_DIR="${REPO_DIR:-/srv/combined-intelligence}"
 CLONE_URL="${CLONE_URL:-https://github.com/bendon/combined-intelligence.git}"
 DEPLOY_USER="${DEPLOY_USER:-ci}"

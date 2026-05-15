@@ -27,6 +27,7 @@ Suggested clone path (edit all `.service` files if you use something else):
 **Phase 1** — packages only (MongoDB, Redis, Qdrant, nginx, Node):
 
 ```bash
+cd ~/combined-intelligence
 sudo bash infra/scripts/bootstrap-ubuntu-phase1-packages.sh
 ```
 

@@ -14,13 +14,15 @@
 # Does NOT create or overwrite backend/.env or infra/.env.
 #
 # Usage:
+#   cd ~/combined-intelligence
 #   sudo env PRIMARY_HOST=20.157.90.21 bash infra/scripts/bootstrap-ubuntu-phase2-app.sh
 # =============================================================================
 set -euo pipefail
 
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-# shellcheck source=bootstrap-ubuntu-common.sh
-source "${SCRIPT_DIR}/bootstrap-ubuntu-common.sh"
+_bootstrap_entry="${BASH_SOURCE[0]}"
+# shellcheck source=bootstrap-ubuntu-init.sh
+source "$(dirname "$_bootstrap_entry")/bootstrap-ubuntu-init.sh"
+SCRIPT_DIR="${BOOTSTRAP_SCRIPT_DIR}"
 
 require_root
 export DEBIAN_FRONTEND=noninteractive

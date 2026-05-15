@@ -21,8 +21,12 @@ Installs: apt deps, Node 20, MongoDB 7, Redis, Qdrant, nginx, user `ci`.
 Writes passwords to `/root/combined-intelligence-secrets.txt`.
 
 ```bash
+cd ~/combined-intelligence    # or /srv/combined-intelligence
+git pull
 sudo bash infra/scripts/bootstrap-ubuntu-phase1-packages.sh
 ```
+
+Do **not** `curl` a single script into `/tmp` — `bootstrap-ubuntu-common.sh` must sit beside it in `infra/scripts/`.
 
 **Does not** clone the repo or create `backend/.env`.
 
