@@ -17,7 +17,9 @@ Terminal `export` / `sudo env BOOTSTRAP_*=...` does **not** configure the runnin
 
 ## Phase 1 — packages only
 
-Installs: apt deps, Node 20, MongoDB 7, Redis, Qdrant, nginx, user `ci`.  
+Installs: apt deps, Node 20, MongoDB 7, Redis, Qdrant, nginx, user `ci`.
+
+On **Ubuntu 24.04 (noble)** the script uses MongoDB's **jammy** apt suite (official repo has no `noble` release yet). This is normal and works on Azure noble VMs.  
 Writes passwords to `/root/combined-intelligence-secrets.txt`.
 
 ```bash

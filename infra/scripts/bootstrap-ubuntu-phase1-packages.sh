@@ -46,29 +46,51 @@ install_node() {
   log "node $(node -v) / npm $(npm -v)"
 }
 
+# MongoDB's apt repo does not publish every Ubuntu LTS immediately (e.g. noble/24.04
+# returns 404 as of 2026). Use the jammy (22.04) suite — packages install fine on noble.
+mongodb_apt_suite() {
+  local codename
+  codename="$(. /etc/os-release && echo "${VERSION_CODENAME:-}")"
+  [[ -n "$codename" ]] || die "Could not read VERSION_CODENAME"
+  case "$codename" in
+    jammy|focal) echo "$codename" ;;
+    *)
+      echo "jammy"
+      ;;
+  esac
+}
+
+install_mongodb_repo() {
+  local suite="$1"
+  curl -fsSL "https://www.mongodb.org/static/pgp/server-7.0.asc" \
+    | gpg --dearmor -o /usr/share/keyrings/mongodb-server-7.0.gpg
+  echo "deb [ signed-by=/usr/share/keyrings/mongodb-server-7.0.gpg arch=amd64,arm64 ] https://repo.mongodb.org/apt/ubuntu ${suite}/mongodb-org/7.0 multiverse" \
+    > /etc/apt/sources.list.d/mongodb-org-7.0.list
+}
+
 install_mongodb() {
+  # Clean up a broken noble repo from an earlier failed run (apt update would fail).
+  if [[ -f /etc/apt/sources.list.d/mongodb-org-7.0.list ]] && \
+     grep -q '/ubuntu noble/' /etc/apt/sources.list.d/mongodb-org-7.0.list 2>/dev/null; then
+    log "MongoDB: removing invalid noble apt source from a previous attempt"
+    rm -f /etc/apt/sources.list.d/mongodb-org-7.0.list
+    apt-get update -y
+  fi
+
   if dpkg -s mongodb-org >/dev/null 2>&1; then
     log "mongodb-org already installed"
   else
-    log "Installing MongoDB 7.0 (mongodb-org)"
-    local codename
-    codename="$(. /etc/os-release && echo "$VERSION_CODENAME")"
-    [[ -n "$codename" ]] || die "Could not read VERSION_CODENAME"
-    curl -fsSL "https://www.mongodb.org/static/pgp/server-7.0.asc" \
-      | gpg --dearmor -o /usr/share/keyrings/mongodb-server-7.0.gpg
-    echo "deb [ signed-by=/usr/share/keyrings/mongodb-server-7.0.gpg arch=amd64,arm64 ] https://repo.mongodb.org/apt/ubuntu ${codename}/mongodb-org/7.0 multiverse" \
-      > /etc/apt/sources.list.d/mongodb-org-7.0.list
+    local os_codename suite
+    os_codename="$(. /etc/os-release && echo "${VERSION_CODENAME:-}")"
+    suite="$(mongodb_apt_suite)"
+    if [[ "$suite" != "$os_codename" ]]; then
+      log "Installing MongoDB 7.0 — Ubuntu ${os_codename} has no MongoDB apt suite; using ${suite}"
+    else
+      log "Installing MongoDB 7.0 (mongodb-org) for Ubuntu ${suite}"
+    fi
+    install_mongodb_repo "$suite"
     apt-get update -y
-    apt-get install -y mongodb-org || {
-      echo "WARN: MongoDB repo failed for ${codename} — trying jammy fallback." >&2
-      rm -f /etc/apt/sources.list.d/mongodb-org-7.0.list
-      curl -fsSL "https://www.mongodb.org/static/pgp/server-7.0.asc" \
-        | gpg --dearmor -o /usr/share/keyrings/mongodb-server-7.0.gpg
-      echo "deb [ signed-by=/usr/share/keyrings/mongodb-server-7.0.gpg arch=amd64,arm64 ] https://repo.mongodb.org/apt/ubuntu jammy/mongodb-org/7.0 multiverse" \
-        > /etc/apt/sources.list.d/mongodb-org-7.0.list
-      apt-get update -y
-      apt-get install -y mongodb-org
-    }
+    apt-get install -y mongodb-org
   fi
 
   systemctl enable mongod
