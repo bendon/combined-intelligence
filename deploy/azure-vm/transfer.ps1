@@ -10,7 +10,7 @@ param(
 $ErrorActionPreference = "Stop"
 $root = Split-Path (Split-Path $PSScriptRoot -Parent) -Parent
 if (-not (Test-Path "$root\deploy\azure-vm\backend.env")) {
-  throw "Missing deploy/azure-vm/backend.env — generate it first."
+  throw "Missing deploy/azure-vm/backend.env - generate it first."
 }
 
 ssh "${User}@${VmHost}" "mkdir -p ${RemoteRepo}/deploy/azure-vm ${RemoteRepo}/backend ${RemoteRepo}/infra/gcp"
@@ -22,7 +22,7 @@ scp "$root\deploy\azure-vm\apply-vm-secrets.sh" "${User}@${VmHost}:${RemoteRepo}
 if (Test-Path "$root\infra\gcp\service-account.json") {
   scp "$root\infra\gcp\service-account.json" "${User}@${VmHost}:${RemoteRepo}/infra/gcp/service-account.json"
 } else {
-  Write-Warning "infra/gcp/service-account.json not found — copy manually."
+  Write-Warning "infra/gcp/service-account.json not found - copy manually."
 }
 
 Write-Host @"
