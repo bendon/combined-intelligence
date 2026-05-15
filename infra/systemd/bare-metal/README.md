@@ -22,6 +22,25 @@ Suggested clone path (edit all `.service` files if you use something else):
   infra/gcp/service-account.json
 ```
 
+## Automated first install
+
+From a fresh Ubuntu 22.04/24.04 VM (run as **root**):
+
+```bash
+git clone https://github.com/bendon/combined-intelligence.git /tmp/ci-bootstrap
+sudo env PRIMARY_HOST=20.157.90.21 \
+  BOOTSTRAP_GCP_PROJECT=edgetech-bdf \
+  bash /tmp/ci-bootstrap/infra/scripts/bootstrap-ubuntu-vm.sh
+```
+
+Or after the repo is already on the server:
+
+```bash
+sudo env PRIMARY_HOST="$(curl -fsS ifconfig.me)" bash infra/scripts/bootstrap-ubuntu-vm.sh
+```
+
+Full options: [`../../scripts/README.md`](../../scripts/README.md).
+
 ## One-time VM prep (Azure)
 
 1. **OS:** Ubuntu 22.04/24.04 LTS (or another distro — adjust package names).
