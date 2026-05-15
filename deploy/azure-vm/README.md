@@ -41,6 +41,7 @@ scp infra/gcp/service-account.json bendon@20.157.90.21:~/combined-intelligence/i
 git pull   # if not already
 chmod +x ~/combined-intelligence/deploy/azure-vm/apply-vm-secrets.sh
 sudo bash ~/combined-intelligence/deploy/azure-vm/apply-vm-secrets.sh
+# (Script finds the repo from its own path; no need for REPO_DIR unless the clone lives elsewhere.)
 
 sudo env PRIMARY_HOST=20.157.90.21 REPO_DIR=/home/bendon/combined-intelligence \
   bash ~/combined-intelligence/infra/scripts/bootstrap-ubuntu-phase2-app.sh
