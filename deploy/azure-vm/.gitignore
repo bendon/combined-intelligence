@@ -1,0 +1,3 @@
+# Secrets / machine-specific — never commit or overwrite via git pull
+backend.env
+infra.env

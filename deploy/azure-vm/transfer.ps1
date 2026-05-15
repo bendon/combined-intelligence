@@ -15,9 +15,9 @@ if (-not (Test-Path "$root\deploy\azure-vm\backend.env")) {
 
 ssh "${User}@${VmHost}" "mkdir -p ${RemoteRepo}/deploy/azure-vm ${RemoteRepo}/backend ${RemoteRepo}/infra/gcp"
 
+# Only copy gitignored env files. Scripts (apply-vm-secrets.sh) come from git pull.
 scp "$root\deploy\azure-vm\backend.env" "${User}@${VmHost}:${RemoteRepo}/deploy/azure-vm/backend.env"
 scp "$root\deploy\azure-vm\infra.env" "${User}@${VmHost}:${RemoteRepo}/deploy/azure-vm/infra.env"
-scp "$root\deploy\azure-vm\apply-vm-secrets.sh" "${User}@${VmHost}:${RemoteRepo}/deploy/azure-vm/apply-vm-secrets.sh"
 
 if (Test-Path "$root\infra\gcp\service-account.json") {
   scp "$root\infra\gcp\service-account.json" "${User}@${VmHost}:${RemoteRepo}/infra/gcp/service-account.json"

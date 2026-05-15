@@ -5,6 +5,7 @@ infra/gcp/service-account.json
 .env.local
 deploy/azure-vm/backend.env
 deploy/azure-vm/infra.env
+backend/.env
 
 # ── Python ─────────────────────────────────────────────────────────────────────
 __pycache__/

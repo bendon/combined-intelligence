@@ -15,6 +15,11 @@ Phase 1 wrote passwords to `/root/combined-intelligence-secrets.txt`.
 | `__JWT_SECRET__` | `JWT_SECRET` |
 | `__FLOWER_PASSWORD__` | `FLOWER_PASSWORD` |
 
+## Order of operations
+
+1. **On the VM:** `git pull` (gets `apply-vm-secrets.sh` from the repo — do not scp it).
+2. **On Windows:** `.\deploy\azure-vm\transfer.ps1` (copies only `backend.env`, `infra.env`, and optional SA key).
+
 ## Transfer (Windows → VM)
 
 From repo root:
@@ -23,16 +28,17 @@ From repo root:
 .\deploy\azure-vm\transfer.ps1
 ```
 
-Or manually:
+Or manually (env files only):
 
 ```powershell
-scp deploy/azure-vm/backend.env deploy/azure-vm/infra.env deploy/azure-vm/apply-vm-secrets.sh bendon@20.157.90.21:~/combined-intelligence/deploy/azure-vm/
+scp deploy/azure-vm/backend.env deploy/azure-vm/infra.env bendon@20.157.90.21:~/combined-intelligence/deploy/azure-vm/
 scp infra/gcp/service-account.json bendon@20.157.90.21:~/combined-intelligence/infra/gcp/
 ```
 
 ## On the VM
 
 ```bash
+git pull   # if not already
 chmod +x ~/combined-intelligence/deploy/azure-vm/apply-vm-secrets.sh
 sudo bash ~/combined-intelligence/deploy/azure-vm/apply-vm-secrets.sh
 
