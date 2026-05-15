@@ -22,24 +22,23 @@ Suggested clone path (edit all `.service` files if you use something else):
   infra/gcp/service-account.json
 ```
 
-## Automated first install
+## Automated install (recommended: two phases)
 
-From a fresh Ubuntu 22.04/24.04 VM (run as **root**):
-
-```bash
-git clone https://github.com/bendon/combined-intelligence.git /tmp/ci-bootstrap
-sudo env PRIMARY_HOST=20.157.90.21 \
-  BOOTSTRAP_GCP_PROJECT=edgetech-bdf \
-  bash /tmp/ci-bootstrap/infra/scripts/bootstrap-ubuntu-vm.sh
-```
-
-Or after the repo is already on the server:
+**Phase 1** — packages only (MongoDB, Redis, Qdrant, nginx, Node):
 
 ```bash
-sudo env PRIMARY_HOST="$(curl -fsS ifconfig.me)" bash infra/scripts/bootstrap-ubuntu-vm.sh
+sudo bash infra/scripts/bootstrap-ubuntu-phase1-packages.sh
 ```
 
-Full options: [`../../scripts/README.md`](../../scripts/README.md).
+**You** — create `backend/.env` and `infra/.env` from `infra/.env.example` (use `127.0.0.1`, not Docker hostnames). Passwords: `/root/combined-intelligence-secrets.txt`.
+
+**Phase 2** — clone/build/systemd (requires `backend/.env`):
+
+```bash
+sudo env PRIMARY_HOST=20.157.90.21 bash infra/scripts/bootstrap-ubuntu-phase2-app.sh
+```
+
+Full guide: [`../../scripts/README.md`](../../scripts/README.md).
 
 ## One-time VM prep (Azure)
 

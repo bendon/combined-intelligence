@@ -1,47 +1,102 @@
-# VM bootstrap scripts
+# VM bootstrap scripts (Ubuntu / Azure, bare metal)
 
-## `bootstrap-ubuntu-vm.sh`
+Two-phase install so you can **install packages first**, then **configure `.env` files**, then **deploy the app**.
 
-One-shot first install (or mostly idempotent re-run) on **Ubuntu 22.04 / 24.04**
-(including **Azure** Linux VMs): MongoDB 7, Redis (password + loopback),
-Qdrant, nginx, Node.js 20, Python venv, frontend build, systemd units for API
-and Celery.
+## Why two phases?
 
-**Run as root** (or `sudo bash`):
+| File | Read by |
+|------|---------|
+| `backend/.env` | FastAPI, Celery, Flower (pydantic `Settings`) |
+| `infra/.env` | TPU CLI, `firewall-tpu-setup.sh` |
+
+Terminal `export` / `sudo env BOOTSTRAP_*=...` does **not** configure the running app. Only these files on disk do.
+
+`infra/.env.example` is a template — copy and split into the two real files with **127.0.0.1** hosts (not Docker names `mongo` / `redis` / `qdrant`).
+
+---
+
+## Phase 1 — packages only
+
+Installs: apt deps, Node 20, MongoDB 7, Redis, Qdrant, nginx, user `ci`.  
+Writes passwords to `/root/combined-intelligence-secrets.txt`.
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/bendon/combined-intelligence/main/infra/scripts/bootstrap-ubuntu-vm.sh | sudo bash -s --
+sudo bash infra/scripts/bootstrap-ubuntu-phase1-packages.sh
 ```
 
-Or after cloning:
+**Does not** clone the repo or create `backend/.env`.
+
+---
+
+## Between phases — you configure secrets
+
+1. Clone the repo (or let phase 2 clone it):
+
+   ```bash
+   sudo git clone https://github.com/bendon/combined-intelligence.git /srv/combined-intelligence
+   sudo chown -R ci:ci /srv/combined-intelligence
+   ```
+
+2. Create **`/srv/combined-intelligence/backend/.env`** (required).  
+   Use passwords from `/root/combined-intelligence-secrets.txt`:
+
+   ```env
+   MONGO_URL=mongodb://ci_app:<MONGO_APP_PASSWORD>@127.0.0.1:27017/combined_intelligence?authSource=combined_intelligence
+   REDIS_URL=redis://:<REDIS_PASSWORD>@127.0.0.1:6379/0
+   QDRANT_URL=http://127.0.0.1:6333
+   JWT_SECRET=<from secrets file>
+   ```
+
+   Add Google OAuth, S3, VAPID, `BASE_URL`, `ALLOWED_ORIGINS`, etc. from `infra/.env.example`.
+
+3. Create **`/srv/combined-intelligence/infra/.env`** for TPU + GCP (`UBUNTU_STATIC_IP`, `TPU_ZONE`, …).
+
+4. Optional: `infra/gcp/service-account.json`
+
+---
+
+## Phase 2 — deploy app
+
+Requires **`backend/.env`** to exist. Will not overwrite it.
 
 ```bash
-cd /path/to/combined-intelligence
+sudo env PRIMARY_HOST=20.157.90.21 bash infra/scripts/bootstrap-ubuntu-phase2-app.sh
+```
+
+Installs: `pip`, `npm run build`, nginx site, systemd (`ci-api`, Celery workers).
+
+---
+
+## One-shot wrapper (optional)
+
+Runs phase 1 always; phase 2 only if `backend/.env` already exists:
+
+```bash
 sudo env PRIMARY_HOST=20.157.90.21 bash infra/scripts/bootstrap-ubuntu-vm.sh
 ```
 
-### Environment variables (optional)
+---
 
-| Variable | Default | Purpose |
+## Variables
+
+| Variable | Default | Used in |
 |----------|---------|---------|
-| `PRIMARY_HOST` | _(required)_ | VM public IP or hostname for nginx `server_name` |
-| `REPO_DIR` | `/srv/combined-intelligence` | Install path |
-| `CLONE_URL` | `https://github.com/bendon/combined-intelligence.git` | Git remote |
-| `DEPLOY_USER` | `ci` | Linux user owning the app |
-| `WEB_ROOT` | `/var/www/combinedintelligence` | nginx static root |
-| `BOOTSTRAP_GCP_PROJECT` | `changeme-gcp-project` | Written to `backend/.env` |
-| `BOOTSTRAP_GOOGLE_CLIENT_ID` | placeholder | Real values strongly recommended |
-| `BOOTSTRAP_GOOGLE_CLIENT_SECRET` | placeholder | |
-| `BOOTSTRAP_S3_ACCESS_KEY` / `BOOTSTRAP_S3_SECRET_KEY` | placeholder | Scaleway (or other S3) |
+| `REPO_DIR` | `/srv/combined-intelligence` | both phases |
+| `DEPLOY_USER` | `ci` | both |
+| `PRIMARY_HOST` | _(required phase 2)_ | nginx `server_name` |
+| `WEB_ROOT` | `/var/www/combinedintelligence` | phase 2 |
+| `SECRETS_FILE` | `/root/combined-intelligence-secrets.txt` | phase 1 |
 
-Secrets for Mongo / Redis / JWT are generated on first run and stored in
-`/root/combined-intelligence-secrets.txt` (mode `600`). Re-runs reuse that file.
+No `BOOTSTRAP_*` variables — configure the app via `.env` files.
 
-### After bootstrap
+---
 
-1. Edit `backend/.env` and `infra/.env` with real Google, S3, GCP, and TPU values.
-2. Place `infra/gcp/service-account.json` on the server (never commit).
-3. `sudo systemctl restart ci-api.service ci-celery-*` and `nginx -t && systemctl reload nginx`.
-4. When you have a domain + DNS, switch nginx to `infra/nginx/combinedintelligence.us.conf` and run **certbot**.
+## After deploy
 
-See also [`../systemd/bare-metal/README.md`](../systemd/bare-metal/README.md).
+```bash
+journalctl -u ci-api.service -f
+systemctl status ci-celery-synthesis
+curl -s http://127.0.0.1:8000/docs
+```
+
+See [`../systemd/bare-metal/README.md`](../systemd/bare-metal/README.md).
