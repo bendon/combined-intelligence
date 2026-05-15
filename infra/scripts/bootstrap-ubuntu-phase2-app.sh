@@ -64,9 +64,29 @@ warn_infra_env() {
   fi
 }
 
+ensure_ci_can_reach_repo() {
+  # When the clone lives under /home/<user>/, that home dir is often 750 (drwxr-x---).
+  # User ci cannot cd into the repo until it may traverse the home directory.
+  if [[ "$REPO_DIR" != /home/* ]]; then
+    return
+  fi
+  local deploy_home="/home/$(echo "$REPO_DIR" | cut -d/ -f3)"
+  [[ -d "$deploy_home" ]] || return
+  if sudo -u "$DEPLOY_USER" test -x "$deploy_home" 2>/dev/null && \
+     sudo -u "$DEPLOY_USER" test -x "$REPO_DIR" 2>/dev/null; then
+    return
+  fi
+  log "Granting ${DEPLOY_USER} traverse access to ${deploy_home} (repo is under a user home)"
+  if command -v setfacl >/dev/null 2>&1; then
+    setfacl -m "u:${DEPLOY_USER}:x" "$deploy_home"
+  else
+    chmod o+x "$deploy_home"
+  fi
+}
+
 setup_user_and_repo() {
   if ! id -u "$DEPLOY_USER" &>/dev/null; then
-    die "Deploy user ${DEPLOY_USER} missing — run phase 1 first."
+    die "Deploy user ${DEPLOY_USER} missing - run phase 1 first."
   fi
   if [[ -d "$REPO_DIR/.git" ]]; then
     log "Repo exists — git pull"
@@ -77,6 +97,7 @@ setup_user_and_repo() {
     log "Cloning ${CLONE_URL} → ${REPO_DIR}"
     git clone "$CLONE_URL" "$REPO_DIR"
   fi
+  ensure_ci_can_reach_repo
   chown -R "${DEPLOY_USER}:${DEPLOY_USER}" "$REPO_DIR"
   require_backend_env
   warn_infra_env
