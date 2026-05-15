@@ -43,8 +43,14 @@ Do **not** `curl` a single script into `/tmp` — `bootstrap-ubuntu-common.sh` m
    sudo chown -R ci:ci /srv/combined-intelligence
    ```
 
-2. Create **`/srv/combined-intelligence/backend/.env`** (required).  
-   Use passwords from `/root/combined-intelligence-secrets.txt`:
+2. Create **`backend/.env`** (required). Quick scaffold from phase-1 secrets:
+
+   ```bash
+   sudo env PRIMARY_HOST=20.157.90.21 bash infra/scripts/generate-bare-metal-env.sh
+   nano backend/.env   # Google OAuth, S3, VAPID, SYNTHESIS_BACKEND
+   ```
+
+   Or hand-write using passwords from `/root/combined-intelligence-secrets.txt`:
 
    ```env
    MONGO_URL=mongodb://ci_app:<MONGO_APP_PASSWORD>@127.0.0.1:27017/combined_intelligence?authSource=combined_intelligence
