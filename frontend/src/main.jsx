@@ -38,17 +38,17 @@ const EditorScreen  = lazy(() => import("./pages/cms/Editor.jsx").then(m => ({ d
 const JobsScreen    = lazy(() => import("./pages/cms/Jobs.jsx").then(m => ({ default: m.JobsScreen })));
 
 function Spinner() {
+  // Transparent fallback: keep the page bg + a faint inline label so route
+  // transitions don't flash a dark panel between unmount and the next paint.
   return (
-    <>
-      <StyleTag />
-      <div style={{
-        display: "flex", alignItems: "center", justifyContent: "center",
-        height: "100vh", background: "#0d0d14", color: "#6b7280",
-        fontFamily: "Inter, sans-serif", fontSize: 14,
-      }}>
-        Loading…
-      </div>
-    </>
+    <div style={{
+      minHeight: "40vh", background: "var(--bg)",
+      display: "flex", alignItems: "center", justifyContent: "center",
+      color: "var(--muted)", fontFamily: "var(--font-mono)",
+      fontSize: 11, letterSpacing: ".22em", fontWeight: 700, textTransform: "uppercase",
+    }}>
+      Loading…
+    </div>
   );
 }
 
@@ -117,6 +117,9 @@ function App() {
 
 createRoot(document.getElementById("root")).render(
   <StrictMode>
+    {/* Mount the global stylesheet ONCE at the root so it's never torn down
+        between route transitions (otherwise pages flash unstyled for a frame). */}
+    <StyleTag />
     <AuthProvider>
       <BrowserRouter>
         <App />

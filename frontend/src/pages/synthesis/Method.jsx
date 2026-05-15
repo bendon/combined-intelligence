@@ -88,16 +88,21 @@ export function MethodPage() {
 
       <h2>The Synthesis Process</h2>
       <p>
-        Each report begins with document ingestion: primary sources — central bank publications,
-        national statistics releases, regulatory filings, and trade data — are processed and
-        embedded into a semantic index. Our AI system, running DeepSeek on dedicated compute,
-        extracts structured findings across all four BISE dimensions.
+        Each report begins with primary sources — central-bank publications, national statistics
+        releases, regulatory filings, and trade data. A named human analyst reads these directly,
+        triangulates findings across all four BISE dimensions, and writes the report: the
+        statistics, the headlines, the correlations, and the predictions.
       </p>
       <p>
-        The AI-generated draft is then reviewed by a human analyst who verifies each data point
-        against primary sources, stress-tests the correlations, and calibrates prediction confidence
-        levels against our historical ledger. The final report is released only after this dual-layer
-        review is complete.
+        Once the analyst has finished writing, the report is reviewed by a second editor who
+        verifies every data point against its primary source, stress-tests the correlations, and
+        calibrates prediction confidence levels against our historical ledger. The final report
+        is released only after this dual-layer review is complete.
+      </p>
+      <p>
+        Internally we use software to make the production faster — converting long-form working
+        documents and PDFs into the structured web layout you read here — but the analysis itself
+        is produced and signed off by human experts.
       </p>
 
       <h2>Predictions and the Ledger</h2>

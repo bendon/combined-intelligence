@@ -44,3 +44,6 @@ celerybeat.pid
 # ── Logs ───────────────────────────────────────────────────────────────────────
 *.log
 logs/
+
+# ── Designs (local reference assets, not source of truth for build) ────────────
+designs/

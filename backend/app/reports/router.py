@@ -5,7 +5,7 @@ from fastapi.responses import JSONResponse
 from app.database import get_db
 from app.auth.jwt import current_user, require_admin
 from app.reports.models import ReportCreate, ReportUpdate, ReportOut, doc_to_out, new_report_doc
-from app.storage.s3 import upload_fileobj, get_presigned_url
+from app.storage.s3 import upload_fileobj, get_presigned_url, public_url
 from app.synthesis.tasks import ingest_report
 from python_slugify import slugify
 from bson import ObjectId
@@ -234,21 +234,21 @@ async def upload_pdf(
 
     key = f"reports/{doc['slug']}/report.pdf"
     data = await file.read()
-    upload_fileobj(io.BytesIO(data), key, content_type="application/pdf")
+    stored_key = upload_fileobj(io.BytesIO(data), key, content_type="application/pdf")
 
     from datetime import datetime, timezone
     await db.reports.update_one(
         {"_id": _oid(report_id)},
-        {"$set": {"s3_pdf_key": key, "updated_at": datetime.now(timezone.utc)}},
+        {"$set": {"s3_pdf_key": stored_key, "updated_at": datetime.now(timezone.utc)}},
     )
 
     # Queue PDF ingestion for synthesis
     ingest_report.apply_async(
-        args=[report_id, key],
+        args=[report_id, stored_key],
         queue="synthesis",
     )
 
-    return {"ok": True, "s3_key": key}
+    return {"ok": True, "s3_key": stored_key}
 
 
 # ── OG image upload ───────────────────────────────────────────────────────────
@@ -272,9 +272,7 @@ async def upload_og_image(
     data = await file.read()
     upload_fileobj(io.BytesIO(data), key, content_type=file.content_type, public=True)
 
-    from app.config import get_settings
-    settings = get_settings()
-    og_url = f"{settings.s3_endpoint_url}/{settings.s3_bucket}/{key}"
+    og_url = public_url(key)
 
     from datetime import datetime, timezone
     await db.reports.update_one(

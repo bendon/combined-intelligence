@@ -1,0 +1,36 @@
+# Combined Intelligence — Celery worker (synthesis + scraper queues)
+#
+# Install:
+#   sudo cp infra/systemd/bare-metal/ci-celery-synthesis.service /etc/systemd/system/
+#   sudo systemctl daemon-reload
+#   sudo systemctl enable --now ci-celery-synthesis.service
+#
+# Edit User / WorkingDirectory / PATH to match your layout (# EDIT ME).
+
+[Unit]
+Description=Combined Intelligence — Celery worker (synthesis queue)
+After=network-online.target
+Wants=network-online.target
+# After=redis-server.service
+
+[Service]
+Type=simple
+User=ci
+Group=ci
+WorkingDirectory=/srv/combined-intelligence/backend
+Environment=PATH=/srv/combined-intelligence/backend/.venv/bin:/usr/bin:/bin
+
+ExecStart=/srv/combined-intelligence/backend/.venv/bin/celery \
+  -A celery_app worker -Q synthesis -c 1 --loglevel=info
+
+Restart=on-failure
+RestartSec=10
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=ci-celery-synthesis
+
+NoNewPrivileges=true
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

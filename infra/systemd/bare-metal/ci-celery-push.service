@@ -1,0 +1,28 @@
+# Combined Intelligence — Celery worker (push queue)
+
+[Unit]
+Description=Combined Intelligence — Celery worker (push queue)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=ci
+Group=ci
+WorkingDirectory=/srv/combined-intelligence/backend
+Environment=PATH=/srv/combined-intelligence/backend/.venv/bin:/usr/bin:/bin
+
+ExecStart=/srv/combined-intelligence/backend/.venv/bin/celery \
+  -A celery_app worker -Q push -c 4 --loglevel=info
+
+Restart=on-failure
+RestartSec=10
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=ci-celery-push
+
+NoNewPrivileges=true
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

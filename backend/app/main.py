@@ -7,6 +7,7 @@ import re
 
 from app.config import get_settings
 from app.database import init_indexes, close_db
+from app.storage.s3 import ensure_prefix_exists as ensure_s3_prefix
 from app.auth.router import router as auth_router
 from app.reports.router import router as reports_router
 from app.reports.og import build_og_html
@@ -29,6 +30,7 @@ _BOT_RE = re.compile(
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     await init_indexes()
+    ensure_s3_prefix()
     yield
     await close_db()
 

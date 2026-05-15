@@ -1,0 +1,30 @@
+# Combined Intelligence — Celery beat (scheduler)
+#
+# Run exactly ONE instance cluster-wide.
+
+[Unit]
+Description=Combined Intelligence — Celery beat
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=ci
+Group=ci
+WorkingDirectory=/srv/combined-intelligence/backend
+Environment=PATH=/srv/combined-intelligence/backend/.venv/bin:/usr/bin:/bin
+
+ExecStart=/srv/combined-intelligence/backend/.venv/bin/celery \
+  -A celery_app beat --loglevel=info
+
+Restart=on-failure
+RestartSec=15
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=ci-celery-beat
+
+NoNewPrivileges=true
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

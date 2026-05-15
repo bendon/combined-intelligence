@@ -1,0 +1,43 @@
+# Combined Intelligence — FastAPI (uvicorn), bare metal
+#
+# Install:
+#   sudo cp infra/systemd/bare-metal/ci-api.service /etc/systemd/system/
+#   sudo systemctl daemon-reload
+#   sudo systemctl enable --now ci-api.service
+#
+# Prereqs: backend venv, backend/.env, Redis/Mongo/Qdrant reachable from .env.
+# Binds API to loopback only — put nginx in front (see infra/nginx/).
+#
+# Edit User / paths marked # EDIT ME.
+
+[Unit]
+Description=Combined Intelligence — FastAPI (uvicorn)
+After=network-online.target
+Wants=network-online.target
+# Uncomment if Redis runs on this host (Ubuntu package name):
+# After=redis-server.service
+# Wants=redis-server.service
+
+[Service]
+Type=simple
+User=ci
+Group=ci
+WorkingDirectory=/srv/combined-intelligence/backend
+Environment=PATH=/srv/combined-intelligence/backend/.venv/bin:/usr/bin:/bin
+
+# Pydantic loads backend/.env from WorkingDirectory.
+ExecStart=/srv/combined-intelligence/backend/.venv/bin/uvicorn app.main:app \
+  --host 127.0.0.1 --port 8000 --workers 2 \
+  --proxy-headers --forwarded-allow-ips=127.0.0.1
+
+Restart=on-failure
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=ci-api
+
+NoNewPrivileges=true
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

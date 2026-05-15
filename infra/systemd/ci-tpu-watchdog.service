@@ -1,0 +1,64 @@
+# Combined Intelligence — daily Spot TPU lease (Ubuntu)
+#
+# This service runs the multi-zone-failover watchdog in `backend/app/tpu/`,
+# leases a Spot TPU on the primary candidate (or rotates to a failover if the
+# primary preempts), and ALWAYS deletes whatever node it created when the
+# service stops — so a missed `systemctl stop` never leaks billing.
+#
+# Install:
+#   sudo cp infra/systemd/ci-tpu-watchdog.service /etc/systemd/system/
+#   sudo cp infra/systemd/ci-tpu-watchdog.timer   /etc/systemd/system/
+#   sudo systemctl daemon-reload
+#   sudo systemctl enable --now ci-tpu-watchdog.timer
+#
+# Manual run / debug:
+#   sudo systemctl start ci-tpu-watchdog.service
+#   journalctl -u ci-tpu-watchdog.service -f
+#
+# Edit the three paths marked `# EDIT ME` to match your deployment layout.
+
+[Unit]
+Description=Combined Intelligence — daily Spot TPU lease (5h, auto-failover)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+
+# EDIT ME — the Ubuntu user that owns the repo + venv.
+User=ci
+Group=ci
+
+# EDIT ME — repo root. backend/ and infra/ must both live below this.
+WorkingDirectory=/srv/combined-intelligence/backend
+
+# EDIT ME — the venv that has httpx + google-auth installed (i.e. backend's).
+Environment="PATH=/srv/combined-intelligence/backend/.venv/bin:/usr/bin:/bin"
+Environment="PYTHONPATH=/srv/combined-intelligence/backend"
+
+ExecStart=/srv/combined-intelligence/backend/.venv/bin/python -m app.tpu watchdog --max-minutes 300
+
+# SIGTERM tells the watchdog to clean up. Give it a generous shutdown
+# window because deleting TPU nodes is async and can take ~30-60s per zone.
+KillSignal=SIGTERM
+TimeoutStopSec=300
+
+# Don't restart automatically — the .timer below restarts daily; tight loops
+# on auth/quota errors should not burn through retries.
+Restart=no
+
+# Hardening — these are conservative defaults; tighten further to taste.
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=read-only
+PrivateTmp=true
+# Allow read+write only inside the repo (logs / state) and /tmp.
+ReadWritePaths=/srv/combined-intelligence
+
+# Stream stdout/stderr to journald with a clear identifier.
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=ci-tpu-watchdog
+
+[Install]
+WantedBy=multi-user.target

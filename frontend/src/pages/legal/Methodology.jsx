@@ -41,20 +41,21 @@ export function MethodologyPage() {
 
       <h2>Document ingestion and synthesis</h2>
       <p>
-        Source documents (PDF reports, statistical releases) are ingested using PDFPlumber for
-        text extraction. Text is split into 500-word chunks with 50-word overlap and embedded
-        using the <code>nomic-embed-text</code> model (768-dimensional vectors) stored in Qdrant.
+        Source documents — primary publications, statistical releases, regulatory filings — are
+        read directly by a named human analyst, who triangulates findings across the four BISE
+        dimensions and writes the report's statistics, headlines, correlations, predictions,
+        hook, and subtitle.
       </p>
       <p>
-        Synthesis is performed by DeepSeek-R1-8B running on a dedicated GPU instance. The model
-        receives the full document text (truncated to 12,000 words where necessary) and is
-        prompted to produce a structured JSON output containing stats, headlines, correlations,
-        predictions, hook, and subtitle.
+        Internally we use document-processing tooling to extract text from PDFs, build a
+        searchable index over the analyst's source material, and convert long-form working
+        documents into the structured web layout you see published. This tooling speeds
+        production and helps the analyst navigate large source corpora; it does not produce
+        the analysis.
       </p>
       <p>
-        Temperature is set to 0.2 to minimise hallucination. The output is then reviewed by a
-        human analyst before publication. See our <a href="/desk/editorial-standards">editorial
-        standards</a> for the review process.
+        Every report is reviewed by a second editor before publication. See our
+        <a href="/desk/editorial-standards"> editorial standards</a> for the full review process.
       </p>
 
       <h2>Prediction scoring</h2>
@@ -86,10 +87,10 @@ export function MethodologyPage() {
 
       <h2>Limitations</h2>
       <p>
-        The synthesis system can misattribute figures or extract erroneous correlations, particularly
-        where source documents contain complex tables or mixed-currency data. Human review is
-        designed to catch these errors but may not catch all of them. Where errors are found after
-        publication, we correct and disclose per our corrections policy.
+        Analysts can misattribute figures or misread complex tables and mixed-currency data,
+        particularly under time pressure. Editorial review is designed to catch these errors,
+        but may not catch all of them. Where errors are found after publication, we correct and
+        disclose per our corrections policy.
       </p>
       <p>
         The calibration framework requires a minimum of 10 resolved predictions per bucket to produce

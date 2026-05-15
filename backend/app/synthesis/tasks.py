@@ -2,23 +2,28 @@
 Celery tasks for report synthesis.
 
 Two modes:
-  • Enhanced synthesis  – Editorial uploads a PDF → Ollama synthesises it enriched
-                         with relevant scraped context (recent news, central bank signals,
-                         trade data) for the same country/topic.
+  • Enhanced synthesis  – Editorial uploads a PDF → the configured LLM backend
+                         synthesises it enriched with relevant scraped context
+                         (recent news, central bank signals, trade data) for the
+                         same country/topic.
 
   • Auto-generation     – When the editorial queue is empty, the system clusters recent
                          scrape_items by country, picks the richest cluster, and generates
                          a Signals Brief automatically (lands as a draft for review).
 
+The LLM call goes through app.synthesis.llm_backend.select_backend(), which
+picks between the Ollama-on-Compute-VM path and the JetStream-on-Spot-TPU
+path based on SYNTHESIS_BACKEND in backend/.env. Tasks don't know or care
+which one runs - the budget-truncation + prompt-formatting logic below is
+identical for both.
+
 Flow (enhanced):
-  ingest_report → synthesize_report (pulls scraped context before calling Ollama)
+  ingest_report → synthesize_report
 
 Flow (auto):
-  auto_generate_report → checks queue → builds composite text → synthesize_report
+  auto_generate_report → checks queue → builds composite text → calls LLM
 """
 import io
-import json
-import time
 import httpx
 import pdfplumber
 from bson import ObjectId
@@ -145,47 +150,42 @@ def ingest_report(self, report_id: str, s3_key: str):
              max_retries=2, default_retry_delay=120, time_limit=1800)
 def synthesize_report(self, report_id: str):
     """
-    Enhanced synthesis: primary report text + scraped contextual signals → Ollama.
+    Enhanced synthesis: primary report text + scraped contextual signals → LLM.
+
+    Backend is picked from settings.synthesis_backend:
+      "ollama_vm"     - Compute VM running Ollama (legacy)
+      "tpu_jetstream" - Spot TPU running JetStream/MaxText (new)
     """
-    from app.synthesis.gcp import start_vm, stop_vm, vm_status
+    from app.synthesis.llm_backend import select_backend
 
     log.info("Synthesizing report %s", report_id)
     _update_job_status(report_id, "running")
 
-    vm_was_running = False
+    backend = select_backend()
+    started_here = False
     try:
-        status = vm_status()
-        if status != "RUNNING":
-            log.info("Starting GCP VM (was %s)", status)
-            start_vm()
-            _wait_for_ollama()
-        else:
-            vm_was_running = True
+        started_here = backend.ensure_up()
 
         primary_text = _get_raw_text(report_id)
         if not primary_text:
             raise RuntimeError("No raw text found — run ingest first")
 
-        # Pull supplementary context from scraper
         report_meta = _get_report_meta(report_id)
         context_text, context_sources = _build_context(report_meta)
 
-        result = _call_ollama_enhanced(primary_text, context_text)
+        result = _call_llm_enhanced(backend, primary_text, context_text)
         result["context_sources"] = context_sources
         _apply_synthesis(report_id, result)
         _update_job_status(report_id, "completed")
-        log.info("Synthesis complete for %s (context sources: %d)", report_id, len(context_sources))
+        log.info("Synthesis complete for %s (backend=%s, context sources: %d)",
+                 report_id, backend.name, len(context_sources))
 
     except Exception as exc:
         log.exception("Synthesis failed for %s", report_id)
         _update_job_status(report_id, "failed", error=str(exc))
         raise self.retry(exc=exc)
     finally:
-        if not vm_was_running:
-            try:
-                stop_vm()
-            except Exception:
-                log.warning("Failed to stop GCP VM — check manually")
+        backend.release(started_here)
 
 
 # ── Auto-generation ────────────────────────────────────────────────────────────
@@ -200,8 +200,6 @@ def auto_generate_report(self):
     A brief is created as status='draft' with auto_generated=True so editorial
     can review before it goes live.
     """
-    from app.synthesis.gcp import start_vm, stop_vm, vm_status
-
     # ── 1. Check editorial queue ──────────────────────────────────────────────
     db = _db()
     cutoff = datetime.now(timezone.utc) - timedelta(hours=12)
@@ -228,27 +226,19 @@ def auto_generate_report(self):
     signals_text = _format_signals(items)
     source_names = list({i["source_name"] for i in items})
 
-    # ── 4. Call Ollama ────────────────────────────────────────────────────────
-    vm_was_running = False
+    # ── 4. Call the configured LLM backend ───────────────────────────────────
+    from app.synthesis.llm_backend import select_backend
+    backend = select_backend()
+    started_here = False
     try:
-        status = vm_status()
-        if status != "RUNNING":
-            start_vm()
-            _wait_for_ollama()
-        else:
-            vm_was_running = True
-
-        result = _call_ollama_autogen(country, signals_text)
+        started_here = backend.ensure_up()
+        result = _call_llm_autogen(backend, country, signals_text)
 
     except Exception as exc:
-        log.exception("auto_generate Ollama call failed")
+        log.exception("auto_generate LLM call failed (backend=%s)", backend.name)
         raise self.retry(exc=exc)
     finally:
-        if not vm_was_running:
-            try:
-                stop_vm()
-            except Exception:
-                log.warning("Failed to stop GCP VM")
+        backend.release(started_here)
 
     # ── 5. Persist as draft report ────────────────────────────────────────────
     from python_slugify import slugify
@@ -400,10 +390,14 @@ def _format_signals(items: list[dict], max_words_per_item: int = 400) -> str:
     return "\n\n---\n\n".join(parts)
 
 
-# ── Ollama callers ─────────────────────────────────────────────────────────────
+# ── LLM callers (backend-agnostic) ─────────────────────────────────────────────
+# These build the prompt + apply the same word-budget truncation as before,
+# then delegate the actual HTTP call to the selected backend (Ollama VM or
+# Spot-TPU JetStream). The prompt budgets stay aggressive on purpose: even
+# v6e-1 with int8-quantised Gemma 2 9B has a context window  - we'd rather
+# truncate the source than spend chip time on tokenising filler text.
 
-def _call_ollama_enhanced(primary_text: str, context_text: str) -> dict:
-    # Budget: 8k words for primary, 4k for context
+def _call_llm_enhanced(backend, primary_text: str, context_text: str) -> dict:
     primary_words = primary_text.split()
     if len(primary_words) > 8000:
         primary_text = " ".join(primary_words[:8000]) + "\n[truncated]"
@@ -416,10 +410,11 @@ def _call_ollama_enhanced(primary_text: str, context_text: str) -> dict:
         primary_text=primary_text,
         context_text=context_text,
     )
-    return _ollama_generate(prompt)
+    from app.synthesis.llm_backend import parse_llm_json
+    return parse_llm_json(backend.generate(prompt))
 
 
-def _call_ollama_autogen(country: str, signals_text: str) -> dict:
+def _call_llm_autogen(backend, country: str, signals_text: str) -> dict:
     words = signals_text.split()
     if len(words) > 10000:
         signals_text = " ".join(words[:10000]) + "\n[truncated]"
@@ -428,29 +423,8 @@ def _call_ollama_autogen(country: str, signals_text: str) -> dict:
         country_or_topic=country,
         signals_text=signals_text,
     )
-    return _ollama_generate(prompt)
-
-
-def _ollama_generate(prompt: str) -> dict:
-    resp = httpx.post(
-        f"{settings.ollama_base_url}/api/generate",
-        json={
-            "model":   settings.ollama_model,
-            "prompt":  prompt,
-            "stream":  False,
-            "options": {"temperature": 0.2},
-        },
-        timeout=600,
-    )
-    resp.raise_for_status()
-    raw = resp.json().get("response", "")
-    # Strip accidental markdown fences
-    raw = raw.strip()
-    if raw.startswith("```"):
-        raw = raw.split("```", 2)[1]
-        if raw.startswith("json"):
-            raw = raw[4:]
-    return json.loads(raw.strip())
+    from app.synthesis.llm_backend import parse_llm_json
+    return parse_llm_json(backend.generate(prompt))
 
 
 # ── Shared helpers ─────────────────────────────────────────────────────────────
@@ -473,18 +447,6 @@ def _chunk_text(text: str, size: int = 500, overlap: int = 50) -> list[str]:
         if chunk:
             chunks.append(chunk)
     return chunks
-
-
-def _wait_for_ollama(retries: int = 24, interval: int = 5) -> None:
-    for _ in range(retries):
-        try:
-            r = httpx.get(f"{settings.ollama_base_url}/api/tags", timeout=5)
-            if r.status_code == 200:
-                return
-        except Exception:
-            pass
-        time.sleep(interval)
-    raise RuntimeError("Ollama did not become ready in time")
 
 
 def _update_job_status(report_id: str, status: str, error: str | None = None) -> None:

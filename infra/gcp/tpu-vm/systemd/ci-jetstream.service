@@ -1,0 +1,67 @@
+[Unit]
+# ────────────────────────────────────────────────────────────────────────────
+# JetStream LLM inference server  -  RUNS ON THE TPU VM (not the Ubuntu box).
+#
+# Installed by /opt/ci-jetstream/bootstrap.sh on first boot. Reads its
+# config from /opt/ci-jetstream/env which bootstrap.sh writes (model path,
+# tokenizer path, port, venv).
+#
+# To override the model on a deployed TPU without recreating it:
+#   1. Edit /opt/ci-jetstream/env on the VM
+#   2. systemctl restart ci-jetstream.service
+# (Better to recreate the node so the next preemption recovers cleanly.)
+# ────────────────────────────────────────────────────────────────────────────
+Description=Combined Intelligence  -  JetStream LLM inference
+After=network-online.target
+Wants=network-online.target
+# Hard requirement: the TPU runtime must be ready before we touch JAX.
+After=google-startup-scripts.service
+
+[Service]
+Type=simple
+EnvironmentFile=/opt/ci-jetstream/env
+WorkingDirectory=/opt/ci-jetstream/maxtext
+
+# JetStream-MaxText entrypoint serving an HTTP-ish interface on $JETSTREAM_PORT.
+# This command line targets the gemma2 model family. Adapt model_name and
+# load_parameters_path if you serve a different MaxText model.
+#
+# Tunable flags (see MaxText docs for the full set):
+#   per_device_batch_size  : raise on >v6e-1 hardware
+#   max_target_length      : context window
+#   ici_*_parallelism      : single-host TPUs use defaults; multi-host needs tuning
+ExecStart=/opt/ci-jetstream/venv/bin/python \
+    -m MaxText.maxengine_server \
+    MaxText/configs/base.yml \
+    model_name=gemma2-9b \
+    tokenizer_path=${TOKENIZER_LOCAL} \
+    load_parameters_path=${CKPT_DIR} \
+    max_prefill_predict_length=1024 \
+    max_target_length=2048 \
+    per_device_batch_size=1 \
+    scan_layers=false \
+    weight_dtype=bfloat16 \
+    quantization=int8 \
+    port=${JETSTREAM_PORT}
+
+# Restart aggressively on failure - TPUs occasionally hiccup, and a bounce
+# is cheaper than letting the backend hit a dead port.
+Restart=on-failure
+RestartSec=10
+# Don't restart-loop forever; if it dies 5 times in 2 min, give up and
+# let the preempt-watch / control-plane recreate the node.
+StartLimitBurst=5
+StartLimitIntervalSec=120
+
+# Output to journal so `journalctl -u ci-jetstream -f` works.
+StandardOutput=journal
+StandardError=journal
+
+# ── Modest hardening (full sandboxing breaks JAX/TPU driver access) ──────
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectSystem=full
+ProtectHome=yes
+
+[Install]
+WantedBy=multi-user.target

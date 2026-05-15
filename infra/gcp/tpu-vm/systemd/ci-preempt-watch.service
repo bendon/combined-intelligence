@@ -1,0 +1,30 @@
+[Unit]
+# ────────────────────────────────────────────────────────────────────────────
+# Spot preemption watcher  -  RUNS ON THE TPU VM.
+#
+# Polls the GCE metadata server for the Spot preemption signal. When set,
+# runs the hook (default: drain JetStream cleanly) so we don't lose
+# in-flight requests. The control-plane watchdog on the Ubuntu server
+# notices the node state change moments later and recreates elsewhere.
+# ────────────────────────────────────────────────────────────────────────────
+Description=Combined Intelligence  -  Spot preemption watcher
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+# 2-second poll - GCP gives ~30s notice on Spot TPUs.
+Environment=PREEMPT_CHECK_INTERVAL_SEC=2
+# On preemption, stop JetStream so in-flight calls return a clean
+# "shutting down" response rather than getting cut mid-stream.
+Environment=PREEMPT_CHECKPOINT_HOOK=systemctl stop ci-jetstream.service
+ExecStart=/usr/local/bin/ci-preempt-watch.sh
+
+Restart=on-failure
+RestartSec=5
+
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

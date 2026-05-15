@@ -1,150 +1,179 @@
-import { useState, useRef } from "react";
-import { Link, useLocation } from "react-router-dom";
+import { useState } from "react";
+import { Link, NavLink, useLocation, useNavigate } from "react-router-dom";
 import { CILogoMark } from "../shared.jsx";
-import { useAuth, LoginButton } from "../auth.jsx";
+import { useAuth } from "../auth.jsx";
+import { auth as authApi } from "../api.js";
 
-const SECTIONS = [
-  {
-    label: "SYNTHESIS",
-    base: "/synthesis",
-    items: [
-      { label: "The Method",            to: "/synthesis/method",  desc: "Our BISE analytical framework" },
-      { label: "Latest Reports",        to: "/synthesis/reports", desc: "Recently published analysis" },
-      { label: "The Library",           to: "/synthesis/library", desc: "Full archive of all reports" },
-      { label: "Featured: Rwanda 2026", to: "/reports/rwanda-financial-overview-2026", desc: "Our flagship frontier-market report", accent: true },
-    ],
-  },
-  {
-    label: "LEDGER",
-    base: "/ledger",
-    items: [
-      { label: "Open Predictions",  to: "/ledger/open",        desc: "Pending forecasts under review" },
-      { label: "Resolved Claims",   to: "/ledger/resolved",    desc: "Outcomes of completed forecasts" },
-      { label: "Calibration Plot",  to: "/ledger/calibration", desc: "Confidence vs. accuracy chart" },
-      { label: "Outcomes",          to: "/ledger/outcomes",    desc: "Aggregate hit-rate statistics" },
-    ],
-  },
-  {
-    label: "DESK",
-    base: "/desk",
-    items: [
-      { label: "About",               to: "/desk/about",               desc: "Our mission and approach" },
-      { label: "Authors",             to: "/desk/authors",             desc: "The analysts behind the desk" },
-      { label: "Editorial Standards", to: "/desk/editorial-standards", desc: "How we verify and publish" },
-      { label: "Contact",             to: "/desk/contact",             desc: "Get in touch with the desk" },
-    ],
-  },
-  {
-    label: "LEGAL",
-    base: "/legal",
-    items: [
-      { label: "Terms",       to: "/legal/terms",       desc: "Terms of service" },
-      { label: "Privacy",     to: "/legal/privacy",     desc: "How we handle your data" },
-      { label: "Methodology", to: "/legal/methodology", desc: "Technical methodology note" },
-      { label: "Sources",     to: "/legal/sources",     desc: "Primary data sources" },
-    ],
-  },
+// Cross-app route nav (used everywhere except the Landing page)
+const ROUTE_NAV = [
+  { label: "SYNTHESIS",  to: "/synthesis/method" },
+  { label: "LEDGER",     to: "/ledger/open" },
+  { label: "DESK",       to: "/desk/about" },
+  { label: "LEGAL",      to: "/legal/terms" },
 ];
 
-export function GlobalNav() {
+// In-page anchor nav for the Landing page (matches the literal design)
+const LANDING_NAV = [
+  { label: "SYNTHESIS",  anchor: "#synthesis" },
+  { label: "SCAN",       anchor: "#scan" },
+  { label: "LEDGER",     anchor: "#ledger" },
+  { label: "MEMBERSHIP", anchor: "#tiers" },
+];
+
+const LANDING_MOBILE_EXTRA = [
+  { label: "LATEST",     anchor: "#reports" },
+];
+
+const SUBSTRIP = [
+  { label: "● Q2 · 2026",            color: "var(--orange)" },
+  { label: "04 LIVE REPORTS" },
+  { label: "09 BOUND CONSTRAINTS" },
+  { label: "76% LIFETIME HIT-RATE",  color: "var(--green)" },
+  { label: "31 SEALED PREDICTIONS" },
+];
+
+export function GlobalNav({ withSubstrip = true, variant = "default" }) {
   const { user, logout } = useAuth();
   const location = useLocation();
-  const [open, setOpen] = useState(null);      // section label or null
-  const [mobileOpen, setMobileOpen] = useState(false);
-  const closeTimer = useRef(null);
+  const navigate = useNavigate();
+  const [drawerOpen, setDrawerOpen] = useState(false);
+  const isAdmin = user && ["admin", "super_admin"].includes(user.role);
+  const isLanding = variant === "landing";
+  const navItems = isLanding ? LANDING_NAV : ROUTE_NAV;
+  const mobileNavItems = isLanding ? [...LANDING_NAV, ...LANDING_MOBILE_EXTRA] : ROUTE_NAV;
 
-  const enter = (label) => {
-    clearTimeout(closeTimer.current);
-    setOpen(label);
+  const handleBrandClick = (e) => {
+    e.preventDefault();
+    setDrawerOpen(false);
+    if (location.pathname === "/" || location.hash) {
+      // Clear any in-page anchor and reset scroll without adding history entries
+      if (location.hash) navigate("/", { replace: true });
+      window.scrollTo({ top: 0, left: 0, behavior: "smooth" });
+    } else {
+      navigate("/");
+      window.scrollTo({ top: 0, left: 0 });
+    }
   };
-  const leave = () => {
-    closeTimer.current = setTimeout(() => setOpen(null), 120);
-  };
-
-  const isActive = (base) => location.pathname.startsWith(base);
 
   return (
-    <header className="g-nav">
-      <div className="g-nav-inner">
-        {/* Logo */}
-        <Link to="/" className="g-nav-logo" onClick={() => setMobileOpen(false)}>
-          <CILogoMark size={30} />
-          <span className="g-nav-wordmark">Combined Intelligence</span>
-        </Link>
-
-        {/* Desktop sections */}
-        <nav className="g-nav-sections">
-          {SECTIONS.map((sec) => (
-            <div
-              key={sec.label}
-              className={`g-nav-section ${isActive(sec.base) ? "active" : ""} ${open === sec.label ? "open" : ""}`}
-              onMouseEnter={() => enter(sec.label)}
-              onMouseLeave={leave}
-            >
-              <span className="g-nav-section-label">{sec.label}</span>
-              <div className="g-nav-dropdown" onMouseEnter={() => enter(sec.label)}>
-                {sec.items.map((item) => (
-                  <Link
-                    key={item.to}
-                    to={item.to}
-                    className={`g-nav-item ${item.accent ? "accent" : ""}`}
-                    onClick={() => setOpen(null)}
-                  >
-                    <span className="g-nav-item-label">{item.label}</span>
-                    <span className="g-nav-item-desc">{item.desc}</span>
-                  </Link>
-                ))}
-              </div>
+    <>
+      <div className="public-header-sticky">
+      <div className="public-nav-wrap">
+        <div className="public-nav-inner">
+          <Link to="/" className="public-nav-brand" onClick={handleBrandClick} aria-label="Combined Intelligence — home">
+            <CILogoMark size={42} />
+            <div>
+              <div className="public-nav-wordmark">Combined Intelligence</div>
+              <div className="public-nav-tagline">The Synthesis of Inevitability</div>
             </div>
-          ))}
-        </nav>
+          </Link>
 
-        {/* Actions */}
-        <div className="g-nav-actions">
-          {user === null && <LoginButton className="btn-ghost btn-sm" />}
-          {user && (
-            <>
-              {["admin", "super_admin"].includes(user.role) && (
-                <Link to="/cms" className="btn-ghost btn-sm">CMS</Link>
-              )}
-              <button onClick={logout} className="btn-ghost btn-sm">Sign out</button>
-            </>
+          <div style={{ flex: 1 }} />
+
+          <nav className="public-nav-links" aria-label="Primary">
+            {navItems.map((n) =>
+              n.anchor ? (
+                <a key={n.label} href={n.anchor} className="public-nav-link">
+                  {n.label}
+                </a>
+              ) : (
+                <NavLink
+                  key={n.label}
+                  to={n.to}
+                  className={({ isActive }) =>
+                    `public-nav-link${isActive || location.pathname.startsWith("/" + n.to.split("/")[1]) ? " active" : ""}`
+                  }
+                >
+                  {n.label}
+                </NavLink>
+              ),
+            )}
+          </nav>
+
+          {!user && (
+            <a href={authApi.loginUrl()} className="public-nav-cta desktop-only">
+              MEMBER ACCESS ›
+            </a>
           )}
-          {/* Hamburger */}
+          {user && (
+            <div style={{ display: "flex", gap: 8 }} className="desktop-only">
+              {isAdmin && <Link to="/cms" className="public-nav-cta ghost">CMS</Link>}
+              <button onClick={logout} className="public-nav-cta ghost">SIGN OUT</button>
+            </div>
+          )}
+
           <button
-            className="g-nav-burger"
-            onClick={() => setMobileOpen((v) => !v)}
-            aria-label="Menu"
+            onClick={() => setDrawerOpen(true)}
+            className="mobile-menu-btn"
+            aria-label="Open menu"
           >
-            <span /><span /><span />
+            <span />
           </button>
+
+          {drawerOpen && <div className="drawer-scrim open" onClick={() => setDrawerOpen(false)} />}
+          <div className={"mobile-drawer " + (drawerOpen ? "open" : "")}>
+            <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 24 }}>
+              <a
+                href="/"
+                onClick={handleBrandClick}
+                aria-label="Combined Intelligence — home"
+                style={{ display: "flex", alignItems: "center", gap: 10, flex: 1, color: "inherit" }}
+              >
+                <CILogoMark size={32} />
+                <div className="serif" style={{ fontSize: 14, textTransform: "uppercase", color: "#fff" }}>
+                  Combined Intelligence
+                </div>
+              </a>
+              <button
+                onClick={() => setDrawerOpen(false)}
+                aria-label="Close menu"
+                style={{ color: "#888", fontSize: 22, lineHeight: 1, padding: 4 }}
+              >×</button>
+            </div>
+            {mobileNavItems.map((n) =>
+              n.anchor ? (
+                <a key={n.label} href={n.anchor} onClick={() => setDrawerOpen(false)}>
+                  {n.label}
+                </a>
+              ) : (
+                <Link key={n.label} to={n.to} onClick={() => setDrawerOpen(false)}>
+                  {n.label}
+                </Link>
+              ),
+            )}
+            {isLanding && (
+              <Link to="/reports/rwanda-financial-overview-2026" onClick={() => setDrawerOpen(false)}>
+                READ FEATURED →
+              </Link>
+            )}
+            {!user && (
+              <a href={authApi.loginUrl()} style={{ color: "var(--purple)" }}>MEMBER ACCESS ›</a>
+            )}
+            {user && (
+              <>
+                {isAdmin && <Link to="/cms" onClick={() => setDrawerOpen(false)} style={{ color: "var(--purple)" }}>CMS</Link>}
+                <button
+                  onClick={() => { logout(); setDrawerOpen(false); }}
+                  style={{
+                    textAlign: "left", padding: "12px 4px", color: "#ddd",
+                    fontFamily: "var(--font-mono)", fontSize: 12, letterSpacing: ".22em",
+                    fontWeight: 700, borderBottom: "1px solid #1f1f1f", width: "100%",
+                  }}
+                >SIGN OUT</button>
+              </>
+            )}
+          </div>
         </div>
       </div>
 
-      {/* Mobile menu */}
-      {mobileOpen && (
-        <div className="g-mobile-menu">
-          {SECTIONS.map((sec) => (
-            <div key={sec.label} className="g-mobile-section">
-              <div className="g-mobile-section-label">{sec.label}</div>
-              {sec.items.map((item) => (
-                <Link
-                  key={item.to}
-                  to={item.to}
-                  className={`g-mobile-item ${item.accent ? "accent" : ""}`}
-                  onClick={() => setMobileOpen(false)}
-                >
-                  {item.label}
-                </Link>
-              ))}
-            </div>
+      {withSubstrip && (
+        <div className="substrip">
+          {SUBSTRIP.map((s) => (
+            <span key={s.label} style={{ color: s.color || "#999" }}>{s.label}</span>
           ))}
-          <div className="g-mobile-auth">
-            {user === null && <LoginButton className="btn-secondary btn-sm" />}
-            {user && <button onClick={logout} className="btn-ghost btn-sm">Sign out</button>}
-          </div>
         </div>
       )}
-    </header>
+      </div>
+    </>
   );
 }

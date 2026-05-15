@@ -34,17 +34,23 @@ export function AboutPage() {
         — a public record of every forecast we have made and its eventual outcome.
       </p>
 
-      <h2>AI-assisted synthesis</h2>
+      <h2>Expert-led synthesis</h2>
       <p>
-        We use AI to accelerate the synthesis process, not to replace analytical judgment.
-        Our system — running DeepSeek on dedicated compute — ingests source documents and extracts
-        structured findings across all four BISE dimensions. A human analyst then reviews, verifies,
-        and calibrates every output before publication.
+        Combined Intelligence is a human-curated reporting engine. Our analysts read the
+        underlying documents — central-bank publications, statistics releases, regulatory
+        filings, sectoral surveys — and write every published claim, headline, and prediction
+        themselves. Each report is signed off by a named human author before it is sealed to
+        the ledger.
       </p>
       <p>
-        We are transparent about this process. The AI-generated draft is a starting point, not an
-        endpoint. Every data point in a published report traces back to a primary source that a
-        human has verified.
+        We use software to take what an expert has already produced — typically a PDF or a
+        long-form working document — and turn it into a structured, web-native report that
+        readers around the world can access from a phone, a desk, or a low-bandwidth
+        connection. The analysis is human; the distribution surface is engineered.
+      </p>
+      <p>
+        Every data point in a published report traces back to a primary source that a human
+        analyst has read and verified.
       </p>
 
       <h2>Independence</h2>

@@ -11,8 +11,19 @@ export function AuthProvider({ children }) {
     auth.me()
       .then(setUser)
       .catch((e) => {
-        if (e.status === 401) setUser(null);
-        else setError(e.message);
+        // 401 = anonymous visitor. Anything else (network failure, 5xx, CORS)
+        // is treated the same so the UI never hangs in the "loading" state —
+        // we just show the public surface and surface the reason in DevTools.
+        if (e?.status && e.status !== 401) {
+          // eslint-disable-next-line no-console
+          console.warn("[auth] /auth/me failed:", e.status, e.message);
+          setError(e.message);
+        } else if (!e?.status) {
+          // eslint-disable-next-line no-console
+          console.warn("[auth] /auth/me unreachable:", e?.message || e);
+          setError(e?.message || "Auth endpoint unreachable");
+        }
+        setUser(null);
       });
   }, []);
 

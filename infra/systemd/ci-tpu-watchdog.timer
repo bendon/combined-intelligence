@@ -1,0 +1,27 @@
+# Daily trigger for ci-tpu-watchdog.service.
+#
+# Default: kicks off at 09:00 server-local-time. The .service caps runtime
+# at 5h (300 min) and the watchdog exits cleanly with full TPU cleanup, so
+# total cost is bounded to ~5h/day of Spot TPU regardless of preemptions.
+#
+# To run twice a day, copy this file and append a second OnCalendar entry,
+# or use multiple .timer units pointing at the same .service.
+
+[Unit]
+Description=Daily 5h Spot TPU lease for Combined Intelligence
+
+[Timer]
+# Trigger every day at 09:00 server local time. Adjust as needed:
+#   *-*-* 09:00:00        every day at 09:00
+#   Mon..Fri *-*-* 08:00  weekdays at 08:00
+#   *-*-* 09,21:00:00     09:00 AND 21:00 (two 5h windows / day)
+OnCalendar=*-*-* 09:00:00
+
+# If the server was down at 09:00, fire the missed run as soon as it boots.
+Persistent=true
+
+# Don't double-fire if a previous run is still active.
+Unit=ci-tpu-watchdog.service
+
+[Install]
+WantedBy=timers.target

@@ -1,0 +1,36 @@
+# Combined Intelligence — Flower (Celery monitoring), loopback only
+#
+# Optional. Listens on 127.0.0.1:5555 — expose only via nginx with auth/IP
+# (see infra/nginx/combinedintelligence.us.conf).
+
+[Unit]
+Description=Combined Intelligence — Flower (Celery UI)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=ci
+Group=ci
+WorkingDirectory=/srv/combined-intelligence/backend
+Environment=PATH=/srv/combined-intelligence/backend/.venv/bin:/usr/bin:/bin
+
+# Credentials: sudo mkdir -p /etc/combined-intelligence && sudo cp
+# infra/systemd/bare-metal/flower.env.example /etc/combined-intelligence/flower.env
+# then chmod 600 and edit the password.
+EnvironmentFile=-/etc/combined-intelligence/flower.env
+ExecStart=/srv/combined-intelligence/backend/.venv/bin/celery \
+  -A celery_app flower --address=127.0.0.1 --port=5555 \
+  --basic_auth=${FLOWER_USER}:${FLOWER_PASSWORD}
+
+Restart=on-failure
+RestartSec=10
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=ci-flower
+
+NoNewPrivileges=true
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

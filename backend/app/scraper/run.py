@@ -231,10 +231,14 @@ def _scrape_pdf_index(source: Source, client: httpx.Client) -> int:
                 continue
 
             slug = re.sub(r"[^a-z0-9]+", "-", title.lower())[:60]
-            s3_key = f"scrape/{source.id}/{slug}.pdf"
+            logical_key = f"scrape/{source.id}/{slug}.pdf"
 
             from app.storage.s3 import upload_fileobj
-            upload_fileobj(io.BytesIO(pdf_resp.content), s3_key, content_type="application/pdf")
+            s3_key = upload_fileobj(
+                io.BytesIO(pdf_resp.content),
+                logical_key,
+                content_type="application/pdf",
+            )
             log.debug("[%s] uploaded PDF to s3://%s", source.id, s3_key)
 
         except Exception as exc:

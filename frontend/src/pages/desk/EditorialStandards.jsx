@@ -28,12 +28,12 @@ export function EditorialStandardsPage() {
 
       <h2>Analytical review</h2>
       <p>
-        The AI-assisted synthesis process produces an initial structured draft. This draft is
-        then reviewed by a human analyst who:
+        Every report is written by a named human analyst. Once the analyst has produced the
+        initial draft, it is reviewed by a second editor who:
       </p>
       <ul>
         <li>Independently verifies each data point against its cited source</li>
-        <li>Stress-tests the correlations identified by the synthesis engine</li>
+        <li>Stress-tests the identified correlations against historical data</li>
         <li>Challenges the predictions for internal consistency</li>
         <li>Reviews confidence levels against our historical calibration data</li>
         <li>Checks that the BISE framework has been applied symmetrically across all four dimensions</li>
@@ -78,12 +78,16 @@ export function EditorialStandardsPage() {
         confidence level and update the ledger entry with a note explaining the revision.
       </p>
 
-      <h2>AI disclosure</h2>
+      <h2>Authorship and tooling</h2>
       <p>
-        We use AI systems to accelerate the synthesis and structuring of analytical content.
-        All published content is reviewed and verified by human analysts before release. We do not
-        publish AI-generated content without human review and sign-off. The use of AI in our
-        process is disclosed in our <a href="/legal/methodology">methodology note</a>.
+        Every published report is written, reviewed, and signed off by named human analysts.
+        We do not publish content that has not been produced and approved by a human author.
+      </p>
+      <p>
+        Internally, our team uses standard editorial and document-processing tooling to move
+        long-form working documents and PDFs into the structured web layout you read here.
+        This tooling speeds production; it does not write our analysis. The full process is
+        documented in our <a href="/legal/methodology">methodology note</a>.
       </p>
     </ProseLayout>
   );
